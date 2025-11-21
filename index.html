@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<title>Dane z TSV – Sortowalna Tabela</title>
+<style>
+body {
+font-family: Arial, sans-serif;
+padding: 20px;
+}
+.table-container {
+width: 100%;
+overflow-x: auto;
+border: 1px solid #ccc;
+padding: 10px;
+}
+table {
+border-collapse: collapse;
+min-width: 1200px;
+}
+th, td {
+border: 1px solid #ddd;
+padding: 8px;
+white-space: nowrap;
+}
+th {
+background: #f2f2f2;
+position: sticky;
+top: 0;
+}
+th button {
+margin-left: 6px;
+padding: 2px 5px;
+font-size: 12px;
+}
+</style>
+</head>
+<body>
+<h1>Compositions <i>ad aequales</i> in the Music Collections of Wawel Cathedral: A Digital Approach to Repertoire Extraction</h1>
+<h2>The dataset</h2>
+<p>This repository contains the dataset used as the basis for the analytical study of ad aequales compositions preserved in the music collections of Wawel Cathedral. The source corpus consists of more than 2,000 works included in the digital editions published through the <a href="https://polishscores.org" target="_blank">Polish Digital Scores portal</a>. For the purposes of the present study, the corpus was narrowed to 884 complete four-voice compositions, counting each movement of a mass cycle as an independent item. Limiting the dataset to fully preserved four-part settings was essential, as incomplete materials would have prevented the application of several analytical procedures and could have obscured the interpretation of their outcomes.</p>
+<div class="table-container">
+<table id="data-table"></table>
+</div>
+
+
+<script>
+const url = "https://raw.githubusercontent.com/jacekiwaszko1/ad-aequales-dataset/refs/heads/main/ad-eaquales-dataset.tsv";
+
+
+async function loadTSV() {
+const response = await fetch(url);
+const text = await response.text();
+const rows = text.trim().split("\n").map(r => r.split("\t"));
+return rows;
+}
+
+
+function renderTable(data) {
+const table = document.getElementById("data-table");
+table.innerHTML = "";
+
+
+const thead = document.createElement("thead");
+const headRow = document.createElement("tr");
+
+
+data[0].forEach((col, index) => {
+const th = document.createElement("th");
+th.textContent = col;
+const btn = document.createElement("button");
+btn.textContent = "↑↓";
+btn.onclick = () => sortTable(index);
+th.appendChild(btn);
+headRow.appendChild(th);
+});
+
+
+thead.appendChild(headRow);
+table.appendChild(thead);
+
+
+const tbody = document.createElement("tbody");
+data.slice(1).forEach(row => {
+const tr = document.createElement("tr");
+row.forEach(cell => {
+const td = document.createElement("td");
+td.textContent = cell;
+tr.appendChild(td);
+});
+tbody.appendChild(tr);
+});
+table.appendChild(tbody);
+}
+
+
+function sortTable(colIndex) {
+const table = document.getElementById("data-table");
+const rows = Array.from(table.querySelectorAll("tbody tr"));
+
+
+const asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") === "asc" ? false : true;
+
+
+rows.sort((a, b) => {
+const A = a.children[colIndex].textContent;
+const B = b.children[colIndex].textContent;
+return asc ? A.localeCompare(B, 'pl') : B.localeCompare(A, 'pl');
+});
+
+
+table.setAttribute("data-sort-col", colIndex);
+table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+
+
+const tbody = table.querySelector("tbody");
+tbody.innerHTML = "";
+rows.forEach(r => tbody.appendChild(r));
+}
+
+
+loadTSV().then(renderTable);
+</script>
+</body>
+</html>
