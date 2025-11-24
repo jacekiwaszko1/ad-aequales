@@ -45,79 +45,79 @@ font-size: 12px;
 <script>
 const url = "https://raw.githubusercontent.com/jacekiwaszko1/ad-aequales-dataset/refs/heads/main/ad-eaquales-dataset.tsv";
 
-
 async function loadTSV() {
-const response = await fetch(url);
-const text = await response.text();
-const rows = text.trim().split("\n").map(r => r.split("\t"));
-return rows;
+  const response = await fetch(url);
+  const text = await response.text();
+  const rows = text.trim().split("\n").map(r => r.split("\t"));
+  return rows;
 }
-
 
 function renderTable(data) {
-const table = document.getElementById("data-table");
-table.innerHTML = "";
+  const table = document.getElementById("data-table");
+  table.innerHTML = "";
 
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
 
-const thead = document.createElement("thead");
-const headRow = document.createElement("tr");
+  data[0].forEach((col, index) => {
+    const th = document.createElement("th");
+    th.textContent = col;
+    const btn = document.createElement("button");
+    btn.textContent = "↑↓";
+    btn.onclick = () => sortTable(index);
+    th.appendChild(btn);
+    headRow.appendChild(th);
+  });
 
+  thead.appendChild(headRow);
+  table.appendChild(thead);
 
-data[0].forEach((col, index) => {
-const th = document.createElement("th");
-th.textContent = col;
-const btn = document.createElement("button");
-btn.textContent = "↑↓";
-btn.onclick = () => sortTable(index);
-th.appendChild(btn);
-headRow.appendChild(th);
-});
-
-
-thead.appendChild(headRow);
-table.appendChild(thead);
-
-
-const tbody = document.createElement("tbody");
-data.slice(1).forEach(row => {
-const tr = document.createElement("tr");
-row.forEach(cell => {
-const td = document.createElement("td");
-td.textContent = cell;
-tr.appendChild(td);
-});
-tbody.appendChild(tr);
-});
-table.appendChild(tbody);
+  const tbody = document.createElement("tbody");
+  data.slice(1).forEach(row => {
+    const tr = document.createElement("tr");
+    row.forEach(cell => {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
 }
-
 
 function sortTable(colIndex) {
-const table = document.getElementById("data-table");
-const rows = Array.from(table.querySelectorAll("tbody tr"));
+  const table = document.getElementById("data-table");
+  const rows = Array.from(table.querySelectorAll("tbody tr"));
 
+  const asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") === "asc" ? false : true;
 
-const asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") === "asc" ? false : true;
+  rows.sort((a, b) => {
+    const A = a.children[colIndex] ? a.children[colIndex].textContent : "";
+    const B = b.children[colIndex] ? b.children[colIndex].textContent : "";
 
+    const numA = parseFloat(A.replace(",", "."));
+    const numB = parseFloat(B.replace(",", "."));
 
-rows.sort((a, b) => {
-const A = a.children[colIndex].textContent;
-const B = b.children[colIndex].textContent;
-return asc ? A.localeCompare(B, 'pl') : B.localeCompare(A, 'pl');
-});
+    const bothNumeric = !isNaN(numA) && !isNaN(numB);
 
+    if (bothNumeric) {
+      return asc ? numA - numB : numB - numA;
+    }
 
-table.setAttribute("data-sort-col", colIndex);
-table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+    return asc ? A.localeCompare(B, 'pl') : B.localeCompare(A, 'pl');
+  });
 
+  table.setAttribute("data-sort-col", colIndex);
+  table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
 
-const tbody = table.querySelector("tbody");
-tbody.innerHTML = "";
-rows.forEach(r => tbody.appendChild(r));
+  const tbody = table.querySelector("tbody");
+  tbody.innerHTML = "";
+  rows.forEach(r => tbody.appendChild(r));
 }
 
+loadTSV().then(renderTable)().then(renderTable);
 
-loadTSV().then(renderTable);
+
 </script>
 </body>
 </html>
