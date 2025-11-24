@@ -43,81 +43,174 @@ font-size: 12px;
 
 
 <script>
-const url = "https://raw.githubusercontent.com/jacekiwaszko1/ad-aequales-dataset/refs/heads/main/ad-eaquales-dataset.tsv";
+document.addEventListener("DOMContentLoaded", () => {
+  const tsvUrl = "https://raw.githubusercontent.com/jacekiwaszko1/ad-aequales-dataset/refs/heads/main/ad-eaquales-dataset.tsv";
 
-async function loadTSV() {
-  const response = await fetch(url);
-  const text = await response.text();
-  const rows = text.trim().split("\n").map(r => r.split("\t"));
-  return rows;
-}
-
-function renderTable(data) {
   const table = document.getElementById("data-table");
-  table.innerHTML = "";
+  let originalData = []; // pełne dane (łącznie z nagłówkiem)
+  let currentData = [];  // dane aktualnie wyświetlane (łącznie z nagłówkiem)
+  let currentFilter = "ALL";
 
-  const thead = document.createElement("thead");
-  const headRow = document.createElement("tr");
+  // przechowuje kolumnę i kierunek ostatniego sortowania
+  const sortState = { col: null, dir: "asc" };
 
-  data[0].forEach((col, index) => {
-    const th = document.createElement("th");
-    th.textContent = col;
-    const btn = document.createElement("button");
-    btn.textContent = "↑↓";
-    btn.onclick = () => sortTable(index);
-    th.appendChild(btn);
-    headRow.appendChild(th);
-  });
+  // --- Load TSV ---
+  async function loadTSV(url) {
+    const response = await fetch(url);
+    const text = await response.text();
+    const rows = text.trim().split("\n").map(r => r.split("\t"));
+    return rows;
+  }
 
-  thead.appendChild(headRow);
-  table.appendChild(thead);
+  // --- Apply filter ---
+  function applyFilter(filterValue) {
+    currentFilter = filterValue;
+    if (filterValue === "ALL") {
+      currentData = [...originalData];
+    } else {
+      // zachowujemy nagłówek (originalData[0])
+      currentData = [originalData[0], ...originalData.slice(1).filter(row => (row[row.length - 1] || "") === filterValue)];
+    }
+    // po filtrze zachowujemy ostatnie sortowanie jeśli istniało
+    if (sortState.col !== null) {
+      sortTable(sortState.col, /*toggle=*/ false);
+    } else {
+      renderTable();
+    }
+  }
 
-  const tbody = document.createElement("tbody");
-  data.slice(1).forEach(row => {
-    const tr = document.createElement("tr");
-    row.forEach(cell => {
-      const td = document.createElement("td");
-      td.textContent = cell;
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  });
-  table.appendChild(tbody);
-}
-
-function sortTable(colIndex) {
-  const table = document.getElementById("data-table");
-  const rows = Array.from(table.querySelectorAll("tbody tr"));
-
-  const asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") === "asc" ? false : true;
-
-  rows.sort((a, b) => {
-    const A = a.children[colIndex] ? a.children[colIndex].textContent : "";
-    const B = b.children[colIndex] ? b.children[colIndex].textContent : "";
-
-    const numA = parseFloat(A.replace(",", "."));
-    const numB = parseFloat(B.replace(",", "."));
-
-    const bothNumeric = !isNaN(numA) && !isNaN(numB);
-
-    if (bothNumeric) {
-      return asc ? numA - numB : numB - numA;
+  // --- Sort table (colIndex) ---
+  // toggle param (domyślnie true) -> czy zmieniać kierunek sortowania względem poprzedniego stanu
+  function sortTable(colIndex, toggle = true) {
+    // toggle kierunku tylko jeśli klikamy tę samą kolumnę
+    if (toggle && sortState.col === colIndex) {
+      sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+    } else {
+      sortState.col = colIndex;
+      sortState.dir = "asc";
     }
 
-    return asc ? A.localeCompare(B, 'pl') : B.localeCompare(A, 'pl');
+    // sortujemy wiersze bez nagłówka
+    const bodyRows = currentData.slice(1);
+
+    bodyRows.sort((rowA, rowB, idxA = 0, idxB = 0) => {
+      const Araw = (rowA[colIndex] !== undefined && rowA[colIndex] !== null) ? String(rowA[colIndex]).trim() : "";
+      const Braw = (rowB[colIndex] !== undefined && rowB[colIndex] !== null) ? String(rowB[colIndex]).trim() : "";
+
+      // próba parsowania liczby (zamieniamy przecinek na kropkę)
+      const numA = parseFloat(Araw.replace(",", "."));
+      const numB = parseFloat(Braw.replace(",", "."));
+      const bothNumeric = Araw !== "" && Braw !== "" && !isNaN(numA) && !isNaN(numB);
+
+      let cmp = 0;
+      if (bothNumeric) {
+        cmp = numA - numB;
+        if (cmp === 0) {
+          // jeśli liczby równe, fallback do porównania tekstowego
+          cmp = Araw.localeCompare(Braw, "pl", { sensitivity: "base" });
+        }
+      } else {
+        cmp = Araw.localeCompare(Braw, "pl", { sensitivity: "base" });
+      }
+
+      return sortState.dir === "asc" ? cmp : -cmp;
+    });
+
+    // odbudowujemy currentData: nagłówek + posortowane wiersze
+    currentData = [currentData[0], ...bodyRows];
+    renderTable();
+  }
+
+  // --- Create header (z dropdownem w ostatniej kolumnie) ---
+  function createHeader(headers) {
+    const thead = document.createElement("thead");
+    const tr = document.createElement("tr");
+
+    headers.forEach((h, index) => {
+      const th = document.createElement("th");
+
+      // tytuł kolumny
+      const title = document.createElement("span");
+      title.textContent = h;
+      th.appendChild(title);
+
+      // przycisk sortowania
+      const btn = document.createElement("button");
+      btn.textContent = " ↕";
+      btn.style.marginLeft = "6px";
+      btn.onclick = () => sortTable(index, /*toggle=*/ true);
+      th.appendChild(btn);
+
+      // dropdown tylko w ostatniej kolumnie
+      if (index === headers.length - 1) {
+        const select = document.createElement("select");
+        select.id = "filter-last-col";
+        select.style.marginLeft = "8px";
+
+        // wartości: ALL, R, R?, (empty) -- w danych empty to ""
+        const options = [
+          { v: "ALL", label: "ALL" },
+          { v: "R\r", label: "R" },
+          { v: "R?\r", label: "R?" },
+          { v: "\r", label: "(empty)" }
+        ];
+
+        options.forEach(optDef => {
+          const opt = document.createElement("option");
+          opt.value = optDef.v;
+          opt.textContent = optDef.label;
+          select.appendChild(opt);
+        });
+
+        // ustaw aktualną wartość dropdownu
+        select.value = currentFilter;
+        select.onchange = (e) => applyFilter(e.target.value);
+        th.appendChild(select);
+      }
+
+      tr.appendChild(th);
+    });
+
+    thead.appendChild(tr);
+    return thead;
+  }
+
+  // --- Render table ---
+  function renderTable() {
+    table.innerHTML = "";
+    if (!currentData || currentData.length === 0) return;
+
+    const headers = originalData[0];
+    table.appendChild(createHeader(headers));
+
+    const tbody = document.createElement("tbody");
+    currentData.slice(1).forEach(row => {
+      const tr = document.createElement("tr");
+      row.forEach(cell => {
+        const td = document.createElement("td");
+        td.textContent = cell;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+
+    // zsynchronizuj dropdown z currentFilter (na wypadek renderowania z zewnątrz)
+    const select = document.getElementById("filter-last-col");
+    if (select) select.value = currentFilter;
+  }
+
+  // --- Init ---
+  loadTSV(tsvUrl).then(data => {
+    originalData = data;
+    currentData = [...originalData];
+    renderTable();
+  }).catch(err => {
+    console.error("Błąd wczytywania TSV:", err);
   });
-
-  table.setAttribute("data-sort-col", colIndex);
-  table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
-
-  const tbody = table.querySelector("tbody");
-  tbody.innerHTML = "";
-  rows.forEach(r => tbody.appendChild(r));
-}
-
-loadTSV().then(renderTable)().then(renderTable);
-
-
+});
 </script>
+
+
 </body>
 </html>
